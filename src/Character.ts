@@ -51,6 +51,10 @@ export class Character {
         return degrees * (Math.PI / 180);
     }
 
+    protected toDegrees(radians:number):number{
+        return radians * (180 / Math.PI);
+    }
+
     //methods
     public showMe():void {
         this.stage.addChild(this._sprite);
