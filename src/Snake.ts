@@ -35,6 +35,18 @@ export class Snake extends Character {
 
     }
 
+    public energizeMe():void {
+        // snake can only gain more energy if less than maximum
+        if (this._speed < SNAKE_MAXSPEED) {
+            this._speed++;
+            this._sprite.dispatchEvent(this.eventSpeedChange);
+        }
+        console.log("Snake energized: " + this.speed);
+        // reset slowdown timer so the interval starts again
+        window.clearInterval(this.slowDownTimer);
+        this.slowDownTimer = window.setInterval(() => this.onSlowDown(), SNAKE_SLOW_DELAY);
+    }
+
     public override rotateMe(){
         this.mouseX = this.stage.mouseX;
         this.mouseY = this.stage.mouseY;

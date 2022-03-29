@@ -4,6 +4,9 @@ export const STAGE_HEIGHT:number = 600;
 export const FRAME_RATE:number = 30;
 export const SNAKE_MAXSPEED:number = 5;
 export const SNAKE_SLOW_DELAY:number = 5000;
+export const BUG_MAX:number = 50;
+export const BUG_START_DELAY = 500;
+export const BUG_DELAY_INCREASE = 500;
 
 export const ASSET_MANIFEST:Object[] = [
     {
