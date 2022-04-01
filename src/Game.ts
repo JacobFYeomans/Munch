@@ -8,6 +8,8 @@ import { STAGE_WIDTH, STAGE_HEIGHT, FRAME_RATE, ASSET_MANIFEST, BUG_MAX, BUG_STA
 import { AssetManager } from "./AssetManager";
 import { Snake } from "./Snake";
 import { Bug } from "./Bug";
+import { UserInterface } from "./UserInterface";
+import { ScreenManager } from "./ScreenManager";
 
 // game variables
 let stage:createjs.StageGL;
@@ -17,6 +19,8 @@ let assetManager:AssetManager;
 let snake:Snake;
 let bugPool:Bug[] = [];
 let background:createjs.Sprite;
+let userInterface:UserInterface;
+let screenManager:ScreenManager;
 
 let bugTimer:number;
 let bugDelay:number;
@@ -26,30 +30,35 @@ let bugsEaten:number;
 function onReady(e:createjs.Event):void {
     console.log(">> spritesheet loaded & ready to add sprites to game");
 
-    background = assetManager.getSprite("sprites", "misc/backgroundGame");
-    stage.addChild(background);
+    // background = assetManager.getSprite("sprites", "misc/backgroundGame");
+    // stage.addChild(background);
+    screenManager = new  ScreenManager(stage, assetManager);
+    screenManager.showIntro();
+
+
+    userInterface = new UserInterface(stage, assetManager);
 
     // construct game objects here
     snake = new Snake(stage, assetManager);
-    snake.showMe();
-    snake.startSlowdown();
+    //snake.showMe();
+    //snake.startSlowdown();
 
-    // bug = new Bug(stage, assetManager, snake)
-    // bug.showMe();
     for (let i:number = 0; i < BUG_MAX; i++){
         bugPool.push(new Bug(stage, assetManager, snake));
     }
 
-    bugsEaten = 0;
-    bugDelay = BUG_START_DELAY;
-    bugTimer = window.setInterval(onAddBug, bugDelay);
+    // bugsEaten = 0;
+    // bugDelay = BUG_START_DELAY;
+    // bugTimer = window.setInterval(onAddBug, bugDelay);
 
-    stage.on("mousedown", onMoveSnake);
+    //stage.on("mousedown", onMoveSnake);
 
     //listen for custom events
     stage.on("bugEaten", onGameEvent);
     stage.on("snakeKilled", onGameEvent);
     stage.on("snakeSpeedChange", onGameEvent);
+    stage.on("gameStart", onGameEvent);
+    stage.on("gameReset", onGameEvent);
     
     // startup the ticker
     createjs.Ticker.framerate = FRAME_RATE;
@@ -70,8 +79,29 @@ function onAddBug():void {
 
 function onGameEvent(e:createjs.Event):void {
     switch (e.type){
+
+        case "gameStart":
+            screenManager.showGame();
+            snake.showMe();
+            snake.startSlowdown();
+            bugsEaten = 0;
+            bugDelay = BUG_START_DELAY;
+            bugTimer = window.setInterval(onAddBug, bugDelay);
+            stage.on("mousedown", onMoveSnake);
+            break;
+
+        case "gameReset":
+            screenManager.showIntro();
+            userInterface.resetMe();
+            //remove remaining bugs
+            for (let bug of bugPool) bug.hideMe();
+            snake.resetMe();
+            snake.hideMe();
+            break;
+
         case "bugEaten":
             bugsEaten++;
+            userInterface.kills = bugsEaten;
             snake.energizeMe();
             //decrease the # of bugs released
             if ((bugsEaten % 10) == 0){
@@ -86,10 +116,11 @@ function onGameEvent(e:createjs.Event):void {
 
         case "snakeKilled":
             window.clearInterval(bugTimer);
+            screenManager.showGameOver();
             break;
 
         case "snakeSpeedChange":
-        
+            userInterface.speed = snake.speed;
             break;
     }
 }

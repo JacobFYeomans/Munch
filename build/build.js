@@ -1263,32 +1263,33 @@ const Constants_1 = __webpack_require__(/*! ./Constants */ "./src/Constants.ts")
 const AssetManager_1 = __webpack_require__(/*! ./AssetManager */ "./src/AssetManager.ts");
 const Snake_1 = __webpack_require__(/*! ./Snake */ "./src/Snake.ts");
 const Bug_1 = __webpack_require__(/*! ./Bug */ "./src/Bug.ts");
+const UserInterface_1 = __webpack_require__(/*! ./UserInterface */ "./src/UserInterface.ts");
+const ScreenManager_1 = __webpack_require__(/*! ./ScreenManager */ "./src/ScreenManager.ts");
 let stage;
 let canvas;
 let assetManager;
 let snake;
 let bugPool = [];
 let background;
+let userInterface;
+let screenManager;
 let bugTimer;
 let bugDelay;
 let bugsEaten;
 function onReady(e) {
     console.log(">> spritesheet loaded & ready to add sprites to game");
-    background = assetManager.getSprite("sprites", "misc/backgroundGame");
-    stage.addChild(background);
+    screenManager = new ScreenManager_1.ScreenManager(stage, assetManager);
+    screenManager.showIntro();
+    userInterface = new UserInterface_1.UserInterface(stage, assetManager);
     snake = new Snake_1.Snake(stage, assetManager);
-    snake.showMe();
-    snake.startSlowdown();
     for (let i = 0; i < Constants_1.BUG_MAX; i++) {
         bugPool.push(new Bug_1.Bug(stage, assetManager, snake));
     }
-    bugsEaten = 0;
-    bugDelay = Constants_1.BUG_START_DELAY;
-    bugTimer = window.setInterval(onAddBug, bugDelay);
-    stage.on("mousedown", onMoveSnake);
     stage.on("bugEaten", onGameEvent);
     stage.on("snakeKilled", onGameEvent);
     stage.on("snakeSpeedChange", onGameEvent);
+    stage.on("gameStart", onGameEvent);
+    stage.on("gameReset", onGameEvent);
     createjs.Ticker.framerate = Constants_1.FRAME_RATE;
     createjs.Ticker.on("tick", onTick);
     console.log(">> game ready");
@@ -1304,8 +1305,26 @@ function onAddBug() {
 }
 function onGameEvent(e) {
     switch (e.type) {
+        case "gameStart":
+            screenManager.showGame();
+            snake.showMe();
+            snake.startSlowdown();
+            bugsEaten = 0;
+            bugDelay = Constants_1.BUG_START_DELAY;
+            bugTimer = window.setInterval(onAddBug, bugDelay);
+            stage.on("mousedown", onMoveSnake);
+            break;
+        case "gameReset":
+            screenManager.showIntro();
+            userInterface.resetMe();
+            for (let bug of bugPool)
+                bug.hideMe();
+            snake.resetMe();
+            snake.hideMe();
+            break;
         case "bugEaten":
             bugsEaten++;
+            userInterface.kills = bugsEaten;
             snake.energizeMe();
             if ((bugsEaten % 10) == 0) {
                 bugDelay = bugDelay + Constants_1.BUG_DELAY_INCREASE;
@@ -1318,8 +1337,10 @@ function onGameEvent(e) {
             break;
         case "snakeKilled":
             window.clearInterval(bugTimer);
+            screenManager.showGameOver();
             break;
         case "snakeSpeedChange":
+            userInterface.speed = snake.speed;
             break;
     }
 }
@@ -1346,6 +1367,65 @@ function main() {
     assetManager.loadAssets(Constants_1.ASSET_MANIFEST);
 }
 main();
+
+
+/***/ }),
+
+/***/ "./src/ScreenManager.ts":
+/*!******************************!*\
+  !*** ./src/ScreenManager.ts ***!
+  \******************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ScreenManager = void 0;
+class ScreenManager {
+    constructor(stage, assetManager) {
+        this.stage = stage;
+        this.introScreen = new createjs.Container();
+        this.introScreen.addChild(assetManager.getSprite("sprites", "misc/backgroundIntro", 0, 0));
+        let snakeSprite = assetManager.getSprite("sprites", "snake/alive", 250, 320);
+        snakeSprite.play();
+        this.introScreen.addChild(snakeSprite);
+        let bugSprite = assetManager.getSprite("sprites", "bug/alive", 340, 320);
+        bugSprite.rotation = -45;
+        bugSprite.play();
+        this.introScreen.addChild(bugSprite);
+        this.gameOverScreen = new createjs.Container();
+        this.gameOverScreen.addChild(assetManager.getSprite("sprites", "misc/backgroundGame", 0, 0));
+        let gameOverSprite = assetManager.getSprite("sprites", "misc/gameOver", 70, 240);
+        this.gameOverScreen.addChild(gameOverSprite);
+        this.gameScreen = assetManager.getSprite("sprites", "misc/backgroundGame", 0, 0);
+        this.startGameEvent = new createjs.Event("gameStart", true, false);
+        this.resetGameEvent = new createjs.Event("gameReset", true, false);
+    }
+    showIntro() {
+        this.hideAll();
+        this.stage.addChildAt(this.introScreen, 0);
+        this.stage.on("click", (e) => {
+            this.stage.dispatchEvent(this.startGameEvent);
+        }, this, true);
+    }
+    showGame() {
+        this.hideAll();
+        this.stage.addChildAt(this.gameScreen, 0);
+    }
+    showGameOver() {
+        this.hideAll();
+        this.stage.addChildAt(this.gameOverScreen, 0);
+        this.stage.on("click", (e) => {
+            this.stage.dispatchEvent(this.resetGameEvent);
+        }, this, true);
+    }
+    hideAll() {
+        this.stage.removeChild(this.introScreen);
+        this.stage.removeChild(this.gameOverScreen);
+        this.stage.removeChild(this.gameScreen);
+    }
+}
+exports.ScreenManager = ScreenManager;
 
 
 /***/ }),
@@ -1490,6 +1570,51 @@ function radiusHit(sprite1, radius1, sprite2, radius2) {
     }
 }
 exports.radiusHit = radiusHit;
+
+
+/***/ }),
+
+/***/ "./src/UserInterface.ts":
+/*!******************************!*\
+  !*** ./src/UserInterface.ts ***!
+  \******************************/
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.UserInterface = void 0;
+const Constants_1 = __webpack_require__(/*! ./Constants */ "./src/Constants.ts");
+class UserInterface {
+    constructor(stage, assetManager) {
+        this.stage = stage;
+        this.sprite = assetManager.getSprite("sprites", "misc/userInterface", 10, 10);
+        stage.addChild(this.sprite);
+        this.txtBugs = new createjs.BitmapText("0", assetManager.getSpriteSheet("glyphs"));
+        this.txtBugs.x = 177;
+        this.txtBugs.y = 13;
+        this.txtBugs.letterSpacing = 2;
+        stage.addChild(this.txtBugs);
+        this.speedBar = assetManager.getSprite("sprites", "misc/speedBar", 41, 15);
+        stage.addChild(this.speedBar);
+        this.resetMe();
+    }
+    set kills(value) {
+        this._kills = value;
+        this.txtBugs.text = String(this._kills);
+    }
+    set speed(value) {
+        this._speed = value;
+        let factor = value / Constants_1.SNAKE_MAXSPEED;
+        this.speedBar.scaleX = factor;
+    }
+    resetMe() {
+        this.kills = 0;
+        this.speed = Constants_1.SNAKE_MAXSPEED;
+        this.speedBar.scaleX = 1;
+    }
+}
+exports.UserInterface = UserInterface;
 
 
 /***/ }),
@@ -3825,7 +3950,7 @@ module.exports.formatError = function (err) {
 /******/ 	
 /******/ 	/* webpack/runtime/getFullHash */
 /******/ 	(() => {
-/******/ 		__webpack_require__.h = () => ("f1b8818904b57e740581")
+/******/ 		__webpack_require__.h = () => ("c4fd68aed6921b89cdbe")
 /******/ 	})();
 /******/ 	
 /******/ 	/* webpack/runtime/global */
